@@ -1,38 +1,39 @@
+import os
 import yfinance as yf
 import pandas as pd
 import ta
-import time
 import asyncio
-import os
 from telegram.ext import ApplicationBuilder
 from telegram.constants import ParseMode
 from datetime import datetime, time as dtime
+from zoneinfo import ZoneInfo  # For IST time zone support (Python 3.9+)
 
-# === Load from Environment ===
+# === Load from Railway Environment Variables ===
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 
-# === Config ===
+# === Your Stock Symbols ===
 SYMBOLS = [
     'TATAMOTORS.NS', 'SBIN.NS', 'IOC.NS', 'PNB.NS', 'YESBANK.NS',
     'IRFC.NS', 'SWIGGY.NS', 'PAYTM.NS', 'IDEA.NS', 'HINDCOPPER.NS'
 ]
 
-app = None  # will be initialized in main()
+app = None  # Telegram app will be created in main()
 
-# === Telegram Message Sender ===
+# === Function: Send Telegram Message ===
 async def send_alert(message):
     print(f"[{datetime.now().strftime('%H:%M:%S')}] 📲 ALERT SENT: {message}")
     await app.bot.send_message(chat_id=CHAT_ID, text=message, parse_mode=ParseMode.HTML)
 
-# === Market Hours Check ===
+# === Function: Check if Indian Market is Open ===
 def is_market_open():
-    now = datetime.now()
+    now = datetime.now(ZoneInfo("Asia/Kolkata"))
     current_time = now.time()
     current_day = now.weekday()
+    print(f"🕒 Current IST time: {now.strftime('%Y-%m-%d %H:%M:%S')} (Weekday: {current_day})")
     return current_day < 5 and dtime(9, 15) <= current_time <= dtime(15, 30)
 
-# === RSI Signal Checker ===
+# === Function: Check RSI Signal for Stock ===
 async def check_signal(symbol):
     try:
         data = yf.download(symbol, interval='1m', period='1d', auto_adjust=True, progress=False)
@@ -53,16 +54,18 @@ async def check_signal(symbol):
     except Exception as e:
         print(f"❌ Error for {symbol}: {e}")
 
-# === Main Loop ===
+# === Main Function ===
 async def main():
     global app
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
     print("📡 Running Stock Alert Bot...")
-
     await send_alert("✅ Test Alert: Bot is active and running!")
+
     if is_market_open():
         await send_alert("✅ Market Opened: Hurry Market is Live Now!")
+    else:
+        await send_alert("❌ Market is currently closed.")
 
     while True:
         if is_market_open():
